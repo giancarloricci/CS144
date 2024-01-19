@@ -1,16 +1,18 @@
 #pragma once
 
 #include "byte_stream.hh"
+#include <map>
 
 class Reassembler
 {
 public:
   // Construct Reassembler to write into given ByteStream.
-  explicit Reassembler( ByteStream&& output ) : output_( std::move( output ) ) {}
+  explicit Reassembler( ByteStream&& output ) : output_( std::move( output ) ) ,
+  first_unassembled_(0), final_index_((size_t)-1), storage() {}
 
   /*
    * Insert a new substring to be reassembled into a ByteStream.
-   *   `first_index`: the index of the first byte of the substring
+   *   `first_index`: the index of the firstbyte of the substring
    *   `data`: the substring itself
    *   `is_last_substring`: this substring represents the end of the stream
    *   `output`: a mutable reference to the Writer
@@ -42,4 +44,11 @@ public:
 
 private:
   ByteStream output_; // the Reassembler writes to this ByteStream
+  uint64_t first_unassembled_; // first index that is unassembled
+  uint64_t final_index_; // end of stream 
+  std::map<uint64_t, std::string> storage; // TODO: std::vec more efficient 
+  // void truncate_data(const string &data, uint64_t index); // TODO: truncate data
+  void storage_insert(const std::string& data, uint64_t);
+  size_t write( std::string data );
+
 };
