@@ -1,5 +1,4 @@
 #include "reassembler.hh"
-#include <iostream>
 
 using namespace std;
 
@@ -16,12 +15,27 @@ void Reassembler::remove_from_storage()
     return;
 
   for ( auto it = storage_.begin(); it != storage_.end(); ) {
-    // Stop once we can't remove any more
-    if ( it->first > first_unassembled_ )
+    // CASE 2: Can't push to byte stream
+    uint64_t first_index = it->first;
+    if ( first_index > first_unassembled_ )
       break;
 
-    // TODO: Actually logic to remove
-    pending_--;
+    // CASE 3: Already pushed all of string
+    string data = it->second;
+    uint64_t end_index = first_index + data.size();
+    if ( end_index <= first_unassembled_ )
+      pending_ -= data.size();
+
+    // CASE 4: Remove data and push to stream
+    else {
+      pending_ -= data.size();
+      // Truncate any data that was already written
+      if ( first_index < first_unassembled_ )
+        data = data.substr( first_unassembled_ - first_index );
+
+      first_unassembled_ += data.size();
+      output_.writer().push( data );
+    }
     it = storage_.erase( it );
   }
 }
