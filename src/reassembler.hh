@@ -1,15 +1,13 @@
 #pragma once
 
 #include "byte_stream.hh"
-#include <map>
+#include <vector>
 
 class Reassembler
 {
 public:
   // Construct Reassembler to write into given ByteStream.
-  explicit Reassembler( ByteStream&& output ) : output_( std::move( output ) ) ,
-  first_unassembled_(0), final_index_((size_t)-1), storage() {}
-
+  explicit Reassembler( ByteStream&& output ) : output_( std::move( output ) ) {}
   /*
    * Insert a new substring to be reassembled into a ByteStream.
    *   `first_index`: the index of the firstbyte of the substring
@@ -43,12 +41,11 @@ public:
   const Writer& writer() const { return output_.writer(); }
 
 private:
-  ByteStream output_; // the Reassembler writes to this ByteStream
-  uint64_t first_unassembled_; // first index that is unassembled
-  uint64_t final_index_; // end of stream 
-  std::map<uint64_t, std::string> storage; // TODO: std::vec more efficient 
-  // void truncate_data(const string &data, uint64_t index); // TODO: truncate data
-  void storage_insert(const std::string& data, uint64_t);
-  size_t write( std::string data );
-
+  ByteStream output_;                                             // the Reassembler writes to this ByteStream
+  uint64_t first_unassembled_ { 0 };                              // first index that is unassembled
+  uint64_t final_index_ { (size_t)-1 };                           // end of stream
+  std::vector<std::pair<uint64_t, std::string>> storage_ {};      // vector storing data and its start index
+  uint64_t pending_ { 0 };                                        // number of bytes waiting
+  void storage_insert( const std::string& data, uint64_t index ); // place data into reassembler storage
+  void remove_from_storage(); // remove as many bytes as possible from storage, pushing to stream
 };
