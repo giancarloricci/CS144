@@ -5,22 +5,25 @@ using namespace std;
 
 void Reassembler::storage_insert( const string& data, uint64_t index )
 {
-  // TODO fix overlapping
   storage_.push_back( make_pair( index, data ) );
   pending_++;
 }
 
 void Reassembler::remove_from_storage()
 {
-  // TODO: re-write remove
+  // CASE 1: Storage is empty
+  if ( storage_.empty() )
+    return;
 
-  // while (true) {
-  // auto it = storage_.find(first_unassembled_);
-  // if (it == storage_.end()) break;
-  // output_.writer().push(data);
-  // storage_.erase(it);
-  // }
-  pending_--;
+  for ( auto it = storage_.begin(); it != storage_.end(); ) {
+    // Stop once we can't remove any more
+    if ( it->first > first_unassembled_ )
+      break;
+
+    // TODO: Actually logic to remove
+    pending_--;
+    it = storage_.erase( it );
+  }
 }
 
 void Reassembler::insert( uint64_t first_index, string data, bool is_last_substring )
@@ -28,19 +31,19 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   if ( is_last_substring )
     final_index_ = first_index + data.size();
 
-  // EDGE CASE 1: No available capacity
-  if ( writer().available_capacity() == 0 )
-    return;
-
-  // EDGE CASE 2: Nothing to add
+  // EDGE CASE 1: Nothing to add
   if ( data.empty() ) {
 
     // Close stream if possible
-    if ( storage_.empty() && is_last_substring ) {
+    if ( storage_.empty() && final_index_ == first_unassembled_ ) {
       output_.writer().close();
     }
     return;
   }
+
+  // EDGE CASE 2: No available capacity
+  if ( writer().available_capacity() == 0 )
+    return;
 
   // EDGE CASE 3: The entire string has alredy been pushed
   uint64_t end_index = first_index + data.size();
@@ -54,27 +57,25 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
 
   // TRUNCATION 1: Unable to store end of string
   if ( end_index > first_unacceptable )
-    data = data.substr( 0, first_unacceptable - first_index ); // truncate if overflow
+    data = data.substr( 0, first_unacceptable - first_index );
 
   // TRUNCATION 2: Beginning of string has already been pushed
-  if ( first_index < first_unassembled_ ) {
-    data = data.substr( first_unassembled_ - first_index ); // truncate any data thats already been written
-  }
+  if ( first_index < first_unassembled_ )
+    data = data.substr( first_unassembled_ - first_index );
 
   // CASE 1: Current index should be pushed to stream
-  if ( first_index == first_unassembled_ ) {
+  if ( first_index <= first_unassembled_ ) {
+    first_unassembled_ += data.size();
     output_.writer().push( data );
     remove_from_storage();
   }
-  // CASE 2: Add as much as possible to re-assembl
-  else {
+  // CASE 2: Add as much as possible to re-assembler
+  else
     storage_insert( data, first_index );
-  }
 
   // Once everything assembled, close stream
-  if ( first_unassembled_ == final_index_ && storage_.empty() ) {
+  if ( first_unassembled_ == final_index_ && storage_.empty() )
     output_.writer().close();
-  }
 }
 
 uint64_t Reassembler::bytes_pending() const
