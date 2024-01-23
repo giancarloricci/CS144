@@ -1,7 +1,7 @@
 #pragma once
 
 #include "byte_stream.hh"
-#include <vector>
+#include <list>
 
 class Reassembler
 {
@@ -44,7 +44,7 @@ private:
   ByteStream output_;                                             // the Reassembler writes to this ByteStream
   uint64_t first_unassembled_ { 0 };                              // first index that is unassembled
   uint64_t final_index_ { (size_t)-1 };                           // end of stream
-  std::vector<std::pair<uint64_t, std::string>> storage_ {};      // vector storing data and its start index
+  std::list<std::pair<uint64_t, std::string>> storage_ {};        // vector storing data and its start index
   uint64_t pending_ { 0 };                                        // number of bytes waiting
   void storage_insert( const std::string& data, uint64_t index ); // place data into reassembler storage
   void remove_from_storage(); // remove as many bytes as possible from storage, pushing to stream

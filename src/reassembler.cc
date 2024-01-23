@@ -4,8 +4,45 @@ using namespace std;
 
 void Reassembler::storage_insert( const string& data, uint64_t index )
 {
-  storage_.push_back( make_pair( index, data ) );
-  pending_++;
+  uint64_t insertion_index = index;
+  uint64_t end_index = index + data.size();
+
+  for ( auto it = storage_.begin(); it != storage_.end(); ) {
+
+    // EDGE CASE: Data cannot be inserted
+    if ( insertion_index >= end_index )
+      return;
+
+    // CASE 1: Insert as much data as possible return
+    uint64_t storage_index = it->first;
+    if ( end_index <= storage_index ) {
+      uint64_t len = end_index - insertion_index;
+      pending_ += len;
+      storage_.emplace( it, make_pair( insertion_index, data.substr( insertion_index - index, len ) ) );
+      return;
+    }
+
+    // CASE 2: Continue searching for space in storage
+    if ( insertion_index >= storage_index ) {
+      insertion_index = std::max( insertion_index, storage_index + it->second.size() );
+      it++;
+      continue;
+    }
+
+    // CASE 3: Store some data and continue searching
+    uint64_t len = storage_index - insertion_index;
+    pending_ += len;
+    storage_.emplace( it, make_pair( insertion_index, data.substr( insertion_index - index, len ) ) );
+    insertion_index = storage_index;
+  }
+
+  // CASE 4: We've reached end, and there's still some space
+  if ( insertion_index < end_index ) {
+    uint64_t len = end_index - insertion_index;
+    pending_ += len;
+    storage_.emplace_back( make_pair( insertion_index, data.substr( insertion_index - index, len ) ) );
+    return;
+  }
 }
 
 void Reassembler::remove_from_storage()
