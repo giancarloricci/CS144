@@ -53,7 +53,7 @@ uint64_t TCPSender::consecutive_retransmissions() const
 void TCPSender::push( const TransmitFunction& transmit )
 {
   (void)transmit;
-  // TODO 
+  // TODO
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
@@ -71,9 +71,26 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-  if (msg.ackno.has_value()) {
-  
-    // TODO
+  window_size_ = msg.window_size;
+
+  if ( msg.ackno.has_value() ) {
+    uint64_t recieved_ackno = msg.ackno.value().unwrap( isn_, ack_no_ );
+
+    while ( !outstanding_segments_.empty() ) {
+
+      TCPSenderMessage front_msg = outstanding_segments_.front();
+      uint64_t front_msg_seq_no = front_msg.seqno.unwrap( isn_, ack_no_ );
+
+      // if this outstanging segment has been acknowledged, remove it
+      if ( front_msg_seq_no + front_msg.sequence_length() <= recieved_ackno ) {
+        outstanding_segments_.pop();
+      } else {
+        break;
+      }
+    }
+
+    if ( outstanding_segments_.empty() )
+      timer_.stop();
   }
 }
 
@@ -81,9 +98,11 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
 {
   timer_.elapse( ms_since_last_tick );
   if ( timer_.expired() ) {
-
-    // TODO: re-transmit
-
+    transmit( outstanding_segments_.front() );
+    if ( window_size_ ) {
+      no_retransmissions_ += 1;
+      timer_.double_RTO();
+    }
     timer_.reset();
     timer_.start();
   }
