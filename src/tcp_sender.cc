@@ -42,28 +42,26 @@ void Timer::restore_RTO()
 
 uint64_t TCPSender::sequence_numbers_in_flight() const
 {
-  // TODO
-  return 0;
+  return bytes_pushed_ - ack_no_;
 }
 
 uint64_t TCPSender::consecutive_retransmissions() const
 {
-  // TODO
-  return 0;
+  return no_retransmissions_;
 }
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
   (void)transmit;
-  // TODO
+  // TODO 
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
 {
   TCPSenderMessage message;
 
-  message.seqno = Wrap32::wrap( bytes_pushed, isn_ );
-  message.SYN = bytes_pushed == 0;
+  message.seqno = Wrap32::wrap( bytes_pushed_, isn_ );
+  message.SYN = bytes_pushed_ == 0;
   message.payload = "";
   message.FIN = false;
   message.RST = false;
@@ -73,15 +71,20 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-  // TODO
-  (void)msg;
+  if (msg.ackno.has_value()) {
+  
+    // TODO
+  }
 }
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
 {
-  timer.elapse( ms_since_last_tick );
-  if ( timer.expired() ) {
-    // TODO
-    (void)transmit;
+  timer_.elapse( ms_since_last_tick );
+  if ( timer_.expired() ) {
+
+    // TODO: re-transmit
+
+    timer_.reset();
+    timer_.start();
   }
 }

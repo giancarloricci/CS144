@@ -37,8 +37,7 @@ public:
     : input_( std::move( input ) )
     , isn_( isn )
     , initial_RTO_ms_( initial_RTO_ms )
-    , bytes_pushed ( 0 )
-    , timer { initial_RTO_ms }
+    , timer_ { initial_RTO_ms }
   {}
 
   /* Generate an empty TCPSenderMessage */
@@ -70,6 +69,8 @@ private:
   ByteStream input_;
   Wrap32 isn_;
   uint64_t initial_RTO_ms_;
-  uint64_t bytes_pushed;
-  Timer timer;
+  Timer timer_;
+  uint64_t bytes_pushed_ { 0 };
+  uint64_t no_retransmissions_ { 0 };
+  uint64_t ack_no_ { 0 };
 };
