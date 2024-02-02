@@ -20,6 +20,7 @@ class Timer
 
 public:
   explicit Timer( uint64_t initial_RTO );
+  uint64_t get();
   void elapse( uint64_t time_elapsed );
   bool expired();
   void stop();
@@ -71,6 +72,7 @@ private:
   uint64_t bytes_pushed_ { 0 };
   uint64_t no_retransmissions_ { 0 };
   uint64_t ack_no_ { 0 };
+  uint64_t highest_ack_no_ { 0 };
   uint64_t window_size_ { 1 };
 
   // keep track of which segments have been sent but not yet acknowledged by the receiver
