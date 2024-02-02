@@ -17,6 +17,7 @@ class Timer
   uint64_t initial_RTO_;
   uint64_t RTO_;
   bool running_;
+  void reset();
 
 public:
   explicit Timer( uint64_t initial_RTO );
@@ -25,8 +26,8 @@ public:
   bool expired();
   void stop();
   void double_RTO();
-  void reset();
   void start();
+  void restart();
   void restore_RTO();
 };
 
@@ -70,12 +71,14 @@ private:
 
   Timer timer_;
   uint64_t bytes_pushed_ { 0 };
-  uint64_t no_retransmissions_ { 0 };
+  uint64_t retransmission_no { 0 };
   uint64_t ack_no_ { 0 };
   uint64_t highest_ack_no_ { 0 };
   uint64_t window_size_ { 1 };
+  bool FIN_sent_ { false };
 
   // keep track of which segments have been sent but not yet acknowledged by the receiver
   std::queue<TCPSenderMessage> outstanding_segments_ {};
   void send_data( const TransmitFunction& transmit, TCPSenderMessage msg );
+  void try_set_FIN( TCPSenderMessage& msg, uint64_t size );
 };
