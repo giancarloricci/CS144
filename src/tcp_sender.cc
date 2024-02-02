@@ -1,5 +1,6 @@
 #include "tcp_sender.hh"
 #include "tcp_config.hh"
+#include <algorithm>
 
 using namespace std;
 
@@ -52,20 +53,43 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  (void)transmit;
-  // TODO
+
+  // special case for initial push
+  if (bytes_pushed_ == 0) {
+    TCPSenderMessage msg = make_empty_message();
+    transmit( msg );
+    bytes_pushed_ += msg.sequence_length();
+    outstanding_segments_.push( msg );
+  }
+
+  uint64_t capacity = ack_no_ + window_size_;
+
+  while ( input_.reader().bytes_buffered() > 0 && capacity > bytes_pushed_ ) {
+
+    uint64_t msg_len = std::min( input_.reader().bytes_buffered(), TCPConfig::MAX_PAYLOAD_SIZE );
+    std::string_view buffer = input_.reader().peek().substr( 0, msg_len );
+    input_.reader().pop( msg_len );
+
+    TCPSenderMessage msg;
+    msg.seqno = Wrap32::wrap( bytes_pushed_, isn_ );
+    msg.SYN = bytes_pushed_ == 0;
+    msg.payload = buffer;
+    msg.FIN = input_.reader().is_finished();
+
+    transmit( msg );
+    outstanding_segments_.push( msg );
+    bytes_pushed_ += msg.sequence_length();
+  }
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
 {
   TCPSenderMessage message;
-
   message.seqno = Wrap32::wrap( bytes_pushed_, isn_ );
   message.SYN = bytes_pushed_ == 0;
   message.payload = "";
   message.FIN = false;
   message.RST = false;
-
   return message;
 }
 
@@ -79,6 +103,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     while ( !outstanding_segments_.empty() ) {
 
       TCPSenderMessage front_msg = outstanding_segments_.front();
+      ack_no_ += front_msg.sequence_length();
       uint64_t front_msg_seq_no = front_msg.seqno.unwrap( isn_, ack_no_ );
 
       // if this outstanging segment has been acknowledged, remove it
