@@ -13,10 +13,10 @@
 
 class Timer
 {
-  uint64_t time;
-  uint64_t initial_RTO;
-  uint64_t RTO;
-  bool running;
+  uint64_t time_;
+  uint64_t initial_RTO_;
+  uint64_t RTO_;
+  bool running_;
 
 public:
   explicit Timer( uint64_t initial_RTO );
@@ -71,8 +71,9 @@ private:
   uint64_t bytes_pushed_ { 0 };
   uint64_t no_retransmissions_ { 0 };
   uint64_t ack_no_ { 0 };
-  uint64_t window_size_ { 1 }; // assume 1
+  uint64_t window_size_ { 1 };
 
   // keep track of which segments have been sent but not yet acknowledged by the receiver
   std::queue<TCPSenderMessage> outstanding_segments_ {};
+  void send_data( const TransmitFunction& transmit, TCPSenderMessage msg );
 };
