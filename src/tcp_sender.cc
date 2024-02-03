@@ -103,19 +103,17 @@ TCPSenderMessage TCPSender::make_empty_message() const
 {
   TCPSenderMessage message;
   message.seqno = Wrap32::wrap( bytes_pushed_, isn_ );
-  if ( input_.writer().has_error() ) {
+  if ( input_.writer().has_error() )
     message.RST = true;
-  }
   return message;
 }
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-  if ( msg.RST ) {
-    input_.writer().set_error();
-  }
-
   window_size_ = msg.window_size;
+
+  if ( msg.RST )
+    input_.writer().set_error();
 
   if ( msg.ackno.has_value() ) {
     uint64_t received_ackno = msg.ackno.value().unwrap( isn_, ack_no_ );
