@@ -22,7 +22,8 @@ measurements if applicable.]: []
 Data Structures:
 
 As mentioned by the spec, the outstanding segments need to be stored.
-I choose to represent these as queue, because these 
+I choose to represent these as queue, because it already imposes a natural
+notion of order based on when they were entered. 
 
 I stored other private variables to implement functionality. 
 Below I will motivate why each variable is stored.
@@ -56,8 +57,10 @@ redundant state; in my mind, all of these variables are necessary and independen
 they can't be used to compute one another. However, perhaps there is an alternate approach 
 which is able to store less information).
 
-Another design decision is the use of a queue. 
-
+Another design decision is the use of a queue. This is nice because it already stores the elems
+based on when they were added. However, I supposed another collection be used if it also kept 
+track of the element time, which would allow the oldest element to be removed. However, I think
+queue is probably the simplest approach for this. 
 
 Implementation Challenges:
 
@@ -67,7 +70,6 @@ a little annoying (and could be avoided by maybe having a hint to be careful abo
 string_views are used!)
 
 Remaining Bugs: There are no current bugs (to my understanding)
-
 
 - Optional: I had unexpected difficulty with: N/A
 
