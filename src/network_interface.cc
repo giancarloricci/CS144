@@ -21,6 +21,17 @@ NetworkInterface::NetworkInterface( string_view name,
        << ip_address.ip() << "\n";
 }
 
+void NetworkInterface::create_and_send_frame( const InternetDatagram& dgram,
+                                              const EthernetAddress& target_ethernet_addr )
+{
+  EthernetFrame frame;
+  frame.header.type = EthernetHeader::TYPE_IPv4;
+  frame.header.src = ethernet_address_;
+  frame.header.dst = target_ethernet_addr;
+  frame.payload = serialize( dgram );
+  transmit( frame );
+}
+
 void NetworkInterface::send_ARP_request( const uint32_t target_ip_address )
 {
   EthernetFrame frame;
@@ -64,22 +75,22 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
   // if the destination Ethernet address is already known
   if ( it != cache_.end() ) {
-    EthernetAddress destination_ethernet = it->second.ethernet_address;
-    EthernetFrame frame;
-    frame.header.type = EthernetHeader::TYPE_IPv4;
-    frame.header.src = ethernet_address_;
-    frame.header.dst = destination_ethernet;
-    frame.payload = serialize( dgram );
-    transmit( frame );
+    create_and_send_frame( dgram, it->second.ethernet_address );
   } else {
-    // If the network interface already sent an ARP request about the same IP address
-    // in the last five seconds, don’t send a second request
-    // just wait for a reply to the first one.
-    bool should_send_arp_request = true; // TODO replace
-    if ( should_send_arp_request ) {
+    bool should_send_ARP = true;
+
+    auto iter = ip_waiting_.find( next_hop_ip );
+    if ( iter != ip_waiting_.end() ) {
+      should_send_ARP = ip_waiting_[next_hop_ip].time_ARP >= ARP_WINDOW_MS;
+      ip_waiting_[next_hop_ip].waiting_datagrams.push( dgram );
+    } else {
+      WaitingDatagrams waiting;
+      waiting.waiting_datagrams.push( dgram );
+      ip_waiting_[next_hop_ip] = waiting;
+    }
+    if ( should_send_ARP ) {
       send_ARP_request( next_hop_ip );
     }
-    // TODO: queue the IP datagram so it can be sent after the ARP reply is received.
   }
 }
 
@@ -107,6 +118,18 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
       cached_entry.ethernet_address = arp.sender_ethernet_address;
       cache_[arp.sender_ip_address] = cached_entry;
 
+      // send waiting
+      auto it = ip_waiting_.find( arp.sender_ip_address );
+      if ( it != ip_waiting_.end() ) {
+
+        while ( !it->second.waiting_datagrams.empty() ) {
+          InternetDatagram dgram = it->second.waiting_datagrams.front();
+          it->second.waiting_datagrams.pop();
+          create_and_send_frame( dgram, arp.sender_ethernet_address );
+        }
+        ip_waiting_.erase( arp.sender_ip_address );
+      }
+
       // if it’s an ARP request asking for our IP address, send an appropriate ARP reply
       if ( arp.opcode == ARPMessage::OPCODE_REQUEST && arp.target_ip_address == ip_address_.ipv4_numeric() ) {
         send_ARP_reply( arp.sender_ip_address, arp.sender_ethernet_address );
@@ -118,6 +141,12 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
+
+  // update the time since last ARP request
+  for ( auto it = ip_waiting_.begin(); it != ip_waiting_.end(); ) {
+    it->second.time_ARP += ms_since_last_tick;
+  }
+
   // expire any IP-to-Ethernet mappings that have expired
   for ( auto it = cache_.begin(); it != cache_.end(); ) {
     it->second.time_cached += ms_since_last_tick;

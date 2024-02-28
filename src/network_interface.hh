@@ -69,6 +69,7 @@ public:
 private:
   void send_ARP_request( const uint32_t target_ip_address );
   void send_ARP_reply( const uint32_t target_ip_address, const EthernetAddress& target_ethernet_addr );
+  void create_and_send_frame( const InternetDatagram& dgram, const EthernetAddress& target_ethernet_addr );
 
   // Human-readable name of the interface
   std::string name_;
@@ -86,7 +87,19 @@ private:
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
 
+  // remember the mapping between the sender’s IP address and Ethernet address for 30 seconds
   size_t MAX_CACHE_TIME_MS = 30000;
+
+  // dont resend if already sent ARP request about the same IP address in the last 5 seconds
+  size_t ARP_WINDOW_MS = 5000;
+
+  struct WaitingDatagrams
+  {
+    size_t time_ARP = 0;
+    std::queue<InternetDatagram> waiting_datagrams {};
+  };
+
+  std::map<uint32_t, WaitingDatagrams> ip_waiting_ {};
 
   struct CachedEthernetAddress
   {
@@ -94,6 +107,6 @@ private:
     EthernetAddress ethernet_address;
   };
 
-  // mapping from IP addresses to Ethernet addresses.
+  // mapping between the sender’s IP address and Ethernet address
   std::map<uint32_t, CachedEthernetAddress> cache_ {};
 };
