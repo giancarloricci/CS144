@@ -21,34 +21,35 @@ NetworkInterface::NetworkInterface( string_view name,
        << ip_address.ip() << "\n";
 }
 
-void send_ARP_request( const uint32_t target_ip_address )
+void NetworkInterface::send_ARP_request( const uint32_t target_ip_address )
 {
   EthernetFrame frame;
   frame.header.type = EthernetHeader::TYPE_ARP;
-  frame.header.src = _ethernet_address;
+  frame.header.src = ethernet_address_;
   frame.header.dst = ETHERNET_BROADCAST;
   ARPMessage arp;
   arp.opcode = ARPMessage::OPCODE_REQUEST;
-  arp.sender_ethernet_address = _ethernet_address;
-  arp.sender_ip_address = _ip_address.ipv4_numeric();
+  arp.sender_ethernet_address = ethernet_address_;
+  arp.sender_ip_address = ip_address_.ipv4_numeric();
   arp.target_ip_address = target_ip_address;
-  frame.payload = arp.serialize();
+  frame.payload = serialize( arp );
   transmit( frame );
 }
 
-void send_ARP_reply( const uint32_t target_ip_address, const EthernetAddress& target_ethernet_addr )
+void NetworkInterface::send_ARP_reply( const uint32_t target_ip_address,
+                                       const EthernetAddress& target_ethernet_addr )
 {
   EthernetFrame frame;
   frame.header.type = EthernetHeader::TYPE_ARP;
-  frame.header.src = _ethernet_address;
+  frame.header.src = ethernet_address_;
   frame.header.dst = target_ethernet_addr;
   ARPMessage arp;
   arp.opcode = ARPMessage::OPCODE_REPLY;
-  arp.sender_ethernet_address = _ethernet_address;
-  arp.sender_ip_address = _ip_address.ipv4_numeric();
-  arp.target_ethernet_address = destination_ethernet_addr;
+  arp.sender_ethernet_address = ethernet_address_;
+  arp.sender_ip_address = ip_address_.ipv4_numeric();
+  arp.target_ethernet_address = target_ethernet_addr;
   arp.target_ip_address = target_ip_address;
-  frame.payload = arp.serialize();
+  frame.payload = serialize( arp );
   transmit( frame );
 }
 
@@ -59,15 +60,16 @@ void send_ARP_reply( const uint32_t target_ip_address, const EthernetAddress& ta
 void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Address& next_hop )
 {
   const uint32_t next_hop_ip = next_hop.ipv4_numeric();
-  EthernetAddress destination_ethernet; // TODO: get this
+  auto it = cache_.find( next_hop_ip );
 
   // if the destination Ethernet address is already known
-  if ( destinationAddress ) {
+  if ( it != cache_.end() ) {
+    EthernetAddress destination_ethernet = it->second.ethernet_address;
     EthernetFrame frame;
     frame.header.type = EthernetHeader::TYPE_IPv4;
-    frame.header.src = _ethernet_address;
+    frame.header.src = ethernet_address_;
     frame.header.dst = destination_ethernet;
-    frame.payload = dgram.serialize();
+    frame.payload = serialize( dgram );
     transmit( frame );
   } else {
     // If the network interface already sent an ARP request about the same IP address
@@ -86,24 +88,27 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
   // ignore any frames not destined for the network interface
   if ( frame.header.dst != ethernet_address_ && frame.header.dst != ETHERNET_BROADCAST ) {
-    return
+    return;
   }
 
   if ( frame.header.type == EthernetHeader::TYPE_IPv4 ) {
     InternetDatagram dgram;
-    if ( parse( dgram, frame.payload ) == ParseResult::NoError ) {
+    if ( parse( dgram, frame.payload ) ) {
       // push the resulting datagram on to the datagrams received queue.
       datagrams_received_.push( dgram );
     }
   } else if ( frame.header.type == EthernetHeader::TYPE_ARP ) {
     ARPMessage arp;
-    if ( parse( arp, frame.payload ) == ParseResult::NoError ) {
-      // TODO
-      // remember the mapping between the sender’s IP address and Ethernet address for 30 seconds.
-      // (Learn mappings from both requests and replies.)
+    if ( parse( arp, frame.payload ) ) {
+
+      // remember mapping between the sender’s IP address and Ethernet address for 30 seconds.
+      CachedEthernetAddress cached_entry;
+      cached_entry.time_cached = 0; // TODO when is the write time?
+      cached_entry.ethernet_address = arp.sender_ethernet_address;
+      cache_[arp.sender_ip_address] = cached_entry;
 
       // if it’s an ARP request asking for our IP address, send an appropriate ARP reply
-      if ( arp.opcode == ARPMessage::OPCODE_REQUEST && arp.target_ip_address == _ip_address.ipv4_numeric() ) {
+      if ( arp.opcode == ARPMessage::OPCODE_REQUEST && arp.target_ip_address == ip_address_.ipv4_numeric() ) {
         send_ARP_reply( arp.sender_ip_address, arp.sender_ethernet_address );
       }
     }
@@ -113,8 +118,13 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
-  // Your code here.
-  (void)ms_since_last_tick;
-
-  // TODO Expire any IP-to-Ethernet mappings that have expired
+  // expire any IP-to-Ethernet mappings that have expired
+  for ( auto it = cache_.begin(); it != cache_.end(); ) {
+    it->second.time_cached += ms_since_last_tick;
+    if ( it->second.time_cached >= MAX_CACHE_TIME_MS ) {
+      it = cache_.erase( it );
+    } else {
+      ++it;
+    }
+  }
 }

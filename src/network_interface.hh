@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <queue>
 
 #include "address.hh"
@@ -66,6 +67,9 @@ public:
   std::queue<InternetDatagram>& datagrams_received() { return datagrams_received_; }
 
 private:
+  void send_ARP_request( const uint32_t target_ip_address );
+  void send_ARP_reply( const uint32_t target_ip_address, const EthernetAddress& target_ethernet_addr );
+
   // Human-readable name of the interface
   std::string name_;
 
@@ -81,4 +85,15 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
+
+  size_t MAX_CACHE_TIME_MS = 30000;
+
+  struct CachedEthernetAddress
+  {
+    size_t time_cached;
+    EthernetAddress ethernet_address;
+  };
+
+  // mapping from IP addresses to Ethernet addresses.
+  std::map<uint32_t, CachedEthernetAddress> cache_ {};
 };
