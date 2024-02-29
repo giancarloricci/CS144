@@ -141,12 +141,16 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
-
   // update the time since last ARP request
   for ( auto it = ip_waiting_.begin(); it != ip_waiting_.end(); ) {
     it->second.time_ARP += ms_since_last_tick;
+    if ( it->second.time_ARP >= ARP_WINDOW_MS ) {
+      it = ip_waiting_.erase( it );
+    } else {
+      ++it;
+    }
   }
-
+  
   // expire any IP-to-Ethernet mappings that have expired
   for ( auto it = cache_.begin(); it != cache_.end(); ) {
     it->second.time_cached += ms_since_last_tick;
