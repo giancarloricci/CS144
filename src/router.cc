@@ -20,11 +20,28 @@ void Router::add_route( const uint32_t route_prefix,
        << static_cast<int>( prefix_length ) << " => " << ( next_hop.has_value() ? next_hop->ip() : "(direct)" )
        << " on interface " << interface_num << "\n";
 
-  // Your code here.
+  routing_table_.emplace_back( route_prefix, prefix_length, next_hop, interface_num );
 }
 
 // Go through all the interfaces, and route every incoming datagram to its proper outgoing interface.
 void Router::route()
 {
-  // Your code here.
+  for ( auto& interface : _interfaces ) {
+    auto& dgrams = interface->datagrams_received();
+    while ( !dgrams.empty() ) {
+      InternetDatagram dgram = dgrams.front();
+      route_datagram( dgram );
+      dgrams.pop();
+    }
+  }
+}
+
+void Router::route_datagram( InternetDatagram dgram )
+{
+  if ( dgram.header.ttl < 1 ) {
+    return;
+  }
+
+  // TODO FIND LONGEST MATCH
+  return;
 }

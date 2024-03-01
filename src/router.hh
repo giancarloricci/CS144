@@ -20,6 +20,18 @@ public:
     return _interfaces.size() - 1;
   }
 
+  // store necessary route information
+  struct RouteEntry
+  {
+    uint32_t route_prefix;
+    uint8_t prefix_length;
+    std::optional<Address> next_hop;
+    size_t interface_num {};
+  };
+
+  // routing table
+  std::vector<RouteEntry> routing_table_ {};
+
   // Access an interface by index
   std::shared_ptr<NetworkInterface> interface( const size_t N ) { return _interfaces.at( N ); }
 
@@ -31,6 +43,8 @@ public:
 
   // Route packets between the interfaces
   void route();
+
+  void route_datagram( InternetDatagram dgram );
 
 private:
   // The router's collection of network interfaces

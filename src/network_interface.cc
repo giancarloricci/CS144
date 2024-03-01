@@ -150,7 +150,7 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
       ++it;
     }
   }
-  
+
   // expire any IP-to-Ethernet mappings that have expired
   for ( auto it = cache_.begin(); it != cache_.end(); ) {
     it->second.time_cached += ms_since_last_tick;
