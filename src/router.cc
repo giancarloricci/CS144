@@ -38,10 +38,24 @@ void Router::route()
 
 void Router::route_datagram( InternetDatagram dgram )
 {
-  if ( dgram.header.ttl < 1 ) {
+  if ( dgram.header.ttl <= 1 )
     return;
-  }
 
-  // TODO FIND LONGEST MATCH
-  return;
+  dgram.header.ttl -= 1;
+  auto dst = dgram.header.dst;
+
+  auto match = find_match( dst );
+  if ( !match.has_value() )
+    return;
+
+  RouteEntry entry = match.value();
+  auto target = _interfaces[entry.interface_num];
+  target->send_datagram( dgram, entry.next_hop.value_or( Address::from_ipv4_numeric( dst ) ) );
+}
+
+std::optional<Router::RouteEntry> Router::find_match( uint32_t dst )
+{
+  (void)dst;
+
+  return {};
 }

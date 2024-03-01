@@ -45,6 +45,7 @@ public:
   void route();
 
   void route_datagram( InternetDatagram dgram );
+  std::optional<RouteEntry> find_match( uint32_t dst );
 
 private:
   // The router's collection of network interfaces
