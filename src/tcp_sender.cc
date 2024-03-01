@@ -75,27 +75,46 @@ void TCPSender::try_set_FIN( TCPSenderMessage& msg, uint64_t size )
   }
 }
 
+void TCPSender::send_data_helper( const TransmitFunction& transmit,
+                                  uint64_t msg_len,
+                                  bool syn,
+                                  bool include_payload )
+{
+  TCPSenderMessage msg = make_empty_message();
+  if ( include_payload ) {
+    std::string buffer = std::string( input_.reader().peek().substr( 0, msg_len ) );
+    input_.reader().pop( msg_len );
+    msg.payload = buffer;
+  }
+  msg.SYN = syn;
+  try_set_FIN( msg, msg_len );
+  send_data( transmit, msg );
+}
+
 void TCPSender::push( const TransmitFunction& transmit )
 {
   uint64_t capacity = highest_ack_no_ + std::max( window_size_, uint64_t { 1 } );
-  if ( bytes_pushed_ == 0 ) {
-    TCPSenderMessage msg = make_empty_message();
-    msg.SYN = true;
-    try_set_FIN( msg, 1 );
-    send_data( transmit, msg );
+
+  if ( bytes_pushed_ == 0 && input_.reader().bytes_buffered() == 0 ) {
+    send_data_helper( transmit, 1, true, false );
+    return;
+  }
+
+  // fix bug found by next test in send_extra
+  if ( bytes_pushed_ == 0 && window_size_ > 1 ) {
+    uint64_t msg_len = std::min( { input_.reader().bytes_buffered(),
+                                   capacity - bytes_pushed_,
+                                   TCPConfig::MAX_PAYLOAD_SIZE,
+                                   window_size_ - 1 } );
+    send_data_helper( transmit, msg_len, true, true );
+    return;
   }
 
   while ( ( input_.reader().bytes_buffered() > 0 || ( input_.reader().is_finished() && !FIN_sent_ ) )
           && capacity > bytes_pushed_ ) {
     uint64_t msg_len
       = std::min( { input_.reader().bytes_buffered(), capacity - bytes_pushed_, TCPConfig::MAX_PAYLOAD_SIZE } );
-    std::string buffer = std::string( input_.reader().peek().substr( 0, msg_len ) );
-    input_.reader().pop( msg_len );
-
-    TCPSenderMessage msg = make_empty_message();
-    msg.payload = buffer;
-    try_set_FIN( msg, msg_len );
-    send_data( transmit, msg );
+    send_data_helper( transmit, msg_len, false, true );
   }
 }
 
@@ -144,6 +163,11 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
 {
+  // handle new student test
+  if ( outstanding_segments_.empty() ) {
+    return;
+  }
+
   timer_.elapse( ms_since_last_tick );
   if ( timer_.expired() ) {
     transmit( outstanding_segments_.front() );

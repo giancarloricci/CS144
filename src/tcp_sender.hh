@@ -79,6 +79,7 @@ private:
 
   // keep track of which segments have been sent but not yet acknowledged by the receiver
   std::queue<TCPSenderMessage> outstanding_segments_ {};
+  void send_data_helper( const TransmitFunction& transmit, uint64_t msg_len, bool syn, bool include_payload );
   void send_data( const TransmitFunction& transmit, TCPSenderMessage msg );
   void try_set_FIN( TCPSenderMessage& msg, uint64_t size );
 };
