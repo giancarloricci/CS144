@@ -50,7 +50,7 @@ void Router::route_datagram( InternetDatagram dgram )
     return;
 
   RouteEntry entry = match.value();
-  auto target = _interfaces[entry.interface_num];
+  auto target = interface( entry.interface_num );
   target->send_datagram( dgram, entry.next_hop.value_or( Address::from_ipv4_numeric( dst ) ) );
 }
 
@@ -58,19 +58,14 @@ std::optional<Router::RouteEntry> Router::find_match( uint32_t dst )
 {
   std::optional<RouteEntry> longest_match;
   size_t longest_prefix_length = 0;
-  (void)dst;
 
   for ( auto& entry : routing_table_ ) {
 
-    // TODO: check most-significant prefix length bits of
-    // the destination address are identical to the most-significant prefix length bits of the
-    // route prefix.
-
-    if ( entry.prefix_length >= longest_prefix_length ) {
+    uint32_t mask = entry.prefix_length == 0 ? 0 : numeric_limits<int>::min() >> ( entry.prefix_length - 1 );
+    if ( ( dst & mask ) == entry.route_prefix && entry.prefix_length >= longest_prefix_length ) {
       longest_match = entry;
       longest_prefix_length = entry.prefix_length;
     }
   }
-
   return longest_match;
 }
