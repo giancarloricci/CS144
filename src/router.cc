@@ -42,6 +42,7 @@ void Router::route_datagram( InternetDatagram dgram )
     return;
 
   dgram.header.ttl -= 1;
+  dgram.header.compute_checksum();
   auto dst = dgram.header.dst;
 
   auto match = find_match( dst );
@@ -55,7 +56,21 @@ void Router::route_datagram( InternetDatagram dgram )
 
 std::optional<Router::RouteEntry> Router::find_match( uint32_t dst )
 {
+  std::optional<RouteEntry> longest_match;
+  size_t longest_prefix_length = 0;
   (void)dst;
 
-  return {};
+  for ( auto& entry : routing_table_ ) {
+
+    // TODO: check most-significant prefix length bits of
+    // the destination address are identical to the most-significant prefix length bits of the
+    // route prefix.
+
+    if ( entry.prefix_length >= longest_prefix_length ) {
+      longest_match = entry;
+      longest_prefix_length = entry.prefix_length;
+    }
+  }
+
+  return longest_match;
 }
